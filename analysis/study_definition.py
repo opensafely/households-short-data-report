@@ -10,4 +10,103 @@ study = StudyDefinition(
     population=patients.registered_with_one_practice_between(
         "2019-02-01", "2020-02-01"
     ),
+    
+    ## HOUSEHOLD INFORMATION
+    
+    household_id=patients.household_as_of(
+        "2020-02-01",
+        returning="pseudo_id",
+        return_expectations={
+            "int": {"distribution": "normal", "mean": 1000, "stddev": 200},
+            "incidence": 1,
+        },
+    ),
+
+    household_size=patients.household_as_of(
+        "2020-02-01",
+        returning="household_size",
+        return_expectations={
+            "int": {"distribution": "normal", "mean": 3, "stddev": 1},
+            "incidence": 1,
+        },
+    ),
+
+    mixed_household=patients.household_as_of(
+        "2020-02-01",
+        returning="has_members_in_other_ehr_systems",
+        return_expectations={ "incidence": 0.75
+        },
+    ),
+
+    percent_tpp=patients.household_as_of(
+        "2020-02-01",
+        returning="percentage_of_members_with_data_in_this_backend",
+        return_expectations={"int": {"distribution": "normal", "mean": 75, "stddev": 10},
+        },
+    ),
+    
+    msoa=patients.address_as_of(
+        "2020-02-01",
+        returning="msoa",
+        return_expectations={
+            "rate": "universal",
+            "category": {"ratios": {"E02000001": 0.0625, "E02000002": 0.0625, "E02000003": 0.0625, "E02000004": 0.0625,
+                                    "E02000005": 0.0625, "E02000007": 0.0625, "E02000008": 0.0625, "E02000009": 0.0625, 
+                                    "E02000010": 0.0625, "E02000011": 0.0625, "E02000012": 0.0625, "E02000013": 0.0625, 
+                                    "E02000014": 0.0625, "E02000015": 0.0625, "E02000016": 0.0625, "E02000017": 0.0625}},
+        },
+    ),    
+
+    rural_urban=patients.address_as_of(
+        "2020-02-01",
+        returning="rural_urban_classification",
+        return_expectations={
+            "rate": "universal",
+            "category": {"ratios": {1: 0.125, 2: 0.125, 3: 0.125, 4: 0.125, 5: 0.125, 6: 0.125, 7: 0.125, 8: 0.125}},
+        },
+    ),
+
+    # # https://github.com/ebmdatalab/tpp-sql-notebook/issues/52
+    imd=patients.address_as_of(
+        "2020-02-01",
+        returning="index_of_multiple_deprivation",
+        round_to_nearest=100,
+        return_expectations={
+            "rate": "universal",
+            "category": {"ratios": {"100": 0.1, "200": 0.2, "300": 0.7}},
+        },
+    ),    
+
+    # PATIENT COVARIATES
+    age=patients.age_as_of(
+        "2020-02-01",
+        return_expectations={
+            "rate": "universal",
+            "int": {"distribution": "population_ages"},
+        },
+    ),
+    # https://github.com/ebmdatalab/tpp-sql-notebook/issues/46
+
+    care_home_type=patients.care_home_status_as_of(
+        "2020-02-01",
+        categorised_as={
+            "PC": """
+              IsPotentialCareHome
+              AND LocationDoesNotRequireNursing='Y'
+              AND LocationRequiresNursing='N'
+            """,
+            "PN": """
+              IsPotentialCareHome
+              AND LocationDoesNotRequireNursing='N'
+              AND LocationRequiresNursing='Y'
+            """,
+            "PS": "IsPotentialCareHome",
+            "U": "DEFAULT",
+        },
+        return_expectations={
+            "rate": "universal",
+            "category": {"ratios": {"PC": 0.05, "PN": 0.05, "PS": 0.05, "U": 0.85,},},
+        },
+    ),
 )
+
