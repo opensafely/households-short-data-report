@@ -1,6 +1,19 @@
 ################################################################################
 # Description: Household variable sense checks
 #
+# + Completeness of:
+#   - household ID
+#   - percent TPP coverage
+#   - household size
+#   - household type
+#   
+# + Sense check and consistency of household size
+#   - By record count
+#   - By pre-defined household size variable
+#   - Total size (household size)/(percent TPP)
+#   
+# + Consistency of household characteristics across residents
+# 
 ################################################################################
 
 ################################################################################
@@ -18,13 +31,19 @@ theme_set(theme_minimal())
 
 options(datatable.old.fread.datetime.character = TRUE)
 
+# Function: calculate mode value across residents in household
+getmode <- function(v) {
+  uniqv <- unique(na.omit(v))
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
 # ---------------------------------------------------------------------------- #
 
 #----------------------#
 #      LOAD DATA       #
 #----------------------#
 
-# args <- c("output/input.csv")
+# args <- c("./output/input.csv")
 args = commandArgs(trailingOnly = TRUE)
 
 dat <- fread(args[1], data.table = FALSE, na.strings = "")
@@ -53,8 +72,8 @@ dat <- filter(dat, household_id > 0 & !is.na(household_id))
 # TPP coverage
 
 print("No. with missing/0 TPP coverage:")
-sum(dat$percent_tpp == 0)
 sum(is.na(dat$percent_tpp))
+sum(dat$percent_tpp == 0)
 
 print("Percent TPP = 0 set to NA.")
 dat$percent_tpp <- na_if(dat$percent_tpp,0)
@@ -66,6 +85,26 @@ ggsave("./output/household_tpp_coverage.png",
        percent_tpp_hist,
        height = 4, width = 6, units = "in")
 
+print("No. with missing/0 HH size:")
+sum(is.na(dat$household_size))
+sum(dat$household_size == 0)
+
+# print("Patients with household size = 0 set to mode across other household residents or NA if mode is also 0.")
+# dat %>%
+#   group_by(household_id) %>%
+#   mutate(mode_hh_size = getmode(household_size)) %>%
+#   ungroup() %>%
+#   mutate(household_size = case_when(household_size == 0 ~ mode_hh_size,
+#                                     household_size != 0 ~ household_size)) -> dat
+
+print("Household size = 0 set to NA.")
+dat$household_size <- na_if(dat$household_size,0)
+
+print("Summary: cleaned household size")
+summary(dat$household_size)
+
+print("No. with missing HH type:")
+sum(is.na(dat$care_home_type))
 
 #------------------------------------------------------------------------------#
 
@@ -75,36 +114,33 @@ ggsave("./output/household_tpp_coverage.png",
 
 # SIZE WITHIN TPP
 
-print("No. with missing HH size:")
-sum(dat$household_size == 0)
-sum(is.na(dat$household_size))
-
-
 # By individual:
 
 dat %>%
   group_by(household_id) %>%
-  mutate(household_n = n(),
-         diff_size_count = household_size - household_n) -> dat
+  mutate(household_n = n()) %>%
+  ungroup() %>%
+  mutate(diff_size_count = household_size - household_n) -> dat
 
-print("Individuals with discrepant household sizes:")
-sum(dat$diff_size_count != 0)
+print("Individuals with non-missing and discrepant household sizes (size - no. records):")
+sum(na.omit(dat$diff_size_count) != 0)
 
 
 # By household:
 
 dat %>%
   group_by(household_id) %>%
-  summarise(household_size_distinct = n_distinct(household_size, na.rm = T),
-            household_size_mean = mean(household_size),
-            household_n = n(),
-            diff_size_count = household_size_mean - household_n) -> hh_size_check
+  summarise(household_n = n(),
+            household_size_distinct = n_distinct(household_size, na.rm = T),
+            household_size_mode = getmode(household_size),
+            household_size_pmiss = sum(is.na(household_size))/household_n,
+            diff_size_count = household_size_mode - household_n) -> hh_size_check
 
 print("Summary of household size, no. records and discrepancies, by household:")
 summary(hh_size_check)
 
 print("Households with discrepant sizes:")
-sum(hh_size_check$diff_size_count != 0)
+sum(na.omit(hh_size_check$diff_size_count != 0))
 
 
 # Distribution of household size and discrepancies:
@@ -112,7 +148,7 @@ sum(hh_size_check$diff_size_count != 0)
 hh_size_check %>%
   pivot_longer(-household_id, names_to = "variable") %>%
   ggplot(aes(value)) +
-    geom_histogram(bins = 50) +
+    geom_histogram(bins = 100) +
     facet_wrap(~variable, scales = "free")
 
 ggsave("./output/household_size_tpp.png",
@@ -129,7 +165,7 @@ dat %>%
 summary(dat$household_size_tot)
 
 ggplot(dat, aes(household_size_tot)) +
-  geom_histogram(bins = 50)
+  geom_histogram(bins = 100)
 
 ggsave("./output/household_size_tot.png",
        height = 4, width = 6, units = "in")
@@ -140,10 +176,10 @@ ggsave("./output/household_size_tot.png",
 print("TPP household size by care home type:")
 dat %>%
   group_by(care_home_type) %>%
-  summarise(mean = mean(household_size),
-            sd = sd(household_size),
-            median = median(household_size),
-            minmax = paste(min(household_size), max(household_size), sep = ", "),
+  summarise(mean = mean(household_size, na.rm = T),
+            median = median(household_size, na.rm = T),
+            quants = paste(quantile(household_size, c(0.25, 0.75), na.rm = T), collapse = ", "),
+            minmax = paste(min(household_size, na.rm = T), max(household_size, na.rm = T), sep = ", "),
             missing = sum(is.na(household_size)))
 
 print("Number of records by care home type:")
@@ -152,19 +188,18 @@ dat %>%
   summarise(household_n = n()) %>%
   group_by(care_home_type) %>%
   summarise(mean = mean(household_n),
-            sd = sd(household_n),
             median = median(household_n),
+            quants = paste(quantile(household_n, c(0.25, 0.75)), collapse = ", "),
             minmax = paste(min(household_n), max(household_n), sep = ", "))
 
 print("Total household size by care home type:")
 dat %>%
   group_by(care_home_type) %>%
-  summarise(mean = mean(household_size_tot),
-            sd = sd(household_size_tot),
-            median = median(household_size_tot),
-            minmax = paste(min(household_size_tot), max(household_size_tot), sep = ", "),
+  summarise(mean = mean(household_size_tot, na.rm = T),
+            median = median(household_size_tot, na.rm = T),
+            quants = paste(round(quantile(household_size_tot, c(0.25, 0.75), na.rm = T)), collapse = ", "),
+            minmax = paste(round(min(household_size_tot, na.rm = T)), round(max(household_size_tot, na.rm = T)), sep = ", "),
             missing = sum(is.na(household_size_tot)))
-
 
 #------------------------------------------------------------------------------#
 
