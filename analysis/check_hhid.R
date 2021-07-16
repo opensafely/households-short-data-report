@@ -79,10 +79,9 @@ print("Percent TPP = 0 set to NA.")
 dat$percent_tpp <- na_if(dat$percent_tpp,0)
 
 ggplot(dat, aes(percent_tpp)) +
-  geom_histogram(bins = 50) -> percent_tpp_hist
+  geom_histogram(bins = 50)
 
 ggsave("./output/household_tpp_coverage.png",
-       percent_tpp_hist,
        height = 4, width = 6, units = "in")
 
 print("No. with missing/0 HH size:")
@@ -100,9 +99,6 @@ sum(dat$household_size == 0)
 print("Household size = 0 set to NA.")
 dat$household_size <- na_if(dat$household_size,0)
 
-print("Summary: cleaned household size")
-summary(dat$household_size)
-
 print("No. with missing HH type:")
 sum(is.na(dat$care_home_type))
 
@@ -112,7 +108,14 @@ sum(is.na(dat$care_home_type))
 #     HOUSEHOLD SIZE      #
 #---------------- --------#
 
+# Define adjusted, total household size
+dat <- dat %>%
+  mutate(household_size_tot = household_size/(percent_tpp/100))
+
 # SIZE WITHIN TPP
+
+print("Summary: TPP household size")
+summary(dat$household_size)
 
 # By individual:
 
@@ -125,50 +128,82 @@ dat %>%
 print("Individuals with non-missing and discrepant household sizes (size - no. records):")
 sum(na.omit(dat$diff_size_count) != 0)
 
+print("Summary of non-zero discrepancies, by individual")
+summary(dat$diff_size_count[dat$diff_size_count != 0])
+
 
 # By household:
 
 dat %>%
   group_by(household_id) %>%
-  summarise(household_n = n(),
+  summarise(percent_tpp_distinct = n_distinct(household_size, na.rm = T),
+            percent_tpp = unique(percent_tpp)[1],
+            household_n = n(),
             household_size_distinct = n_distinct(household_size, na.rm = T),
-            household_size_mode = getmode(household_size),
             household_size_pmiss = sum(is.na(household_size))/household_n,
-            diff_size_count = household_size_mode - household_n) -> hh_size_check
+            household_size = unique(household_size)[1],
+            diff_size_count = household_size - household_n,
+            household_size_tot = unique(household_size_tot)[1]) -> hh_size_check
 
-print("Summary of household size, no. records and discrepancies, by household:")
+print("Summary of TPP/total household size, no. records and discrepancies, by household:")
 summary(hh_size_check)
 
-print("Households with discrepant sizes:")
+print("No. households with discrepant sizes:")
 sum(na.omit(hh_size_check$diff_size_count != 0))
 
+print("Summary of non-zero discrepancies, by household:")
+summary(hh_size_check$diff_size_count[hh_size_check$diff_size_count != 0])
+
+print("No. households with discrepant sizes > 10")
+sum(na.omit(hh_size_check$diff_size_count > 100))
 
 # Distribution of household size and discrepancies:
 
 hh_size_check %>%
-  pivot_longer(-household_id, names_to = "variable") %>%
-  ggplot(aes(value)) +
-    geom_histogram(bins = 100) +
-    facet_wrap(~variable, scales = "free")
+  filter(diff_size_count != 0) %>%
+  ggplot(aes(diff_size_count)) +
+    geom_histogram(bins = 50) +
+    labs("Non-zero differences between size and count, per household")
 
-ggsave("./output/household_size_tpp.png",
+ggsave("./output/household_size_discrepancies.png",
+       height = 6, width = 8)
+
+hh_size_check %>%
+  ggplot(aes(diff_size_count)) +
+  geom_histogram(bins = 50) +
+  xlim(c(min(hh_size_check$diff_size_count, na.rm = T), 
+         quantile(hh_size_check$diff_size_count, 0.99, na.rm = T))) +
+  labs("Non-zero differences between size and count, per household",
+       subtitle = "x-axis cut at 99th percentile")
+
+ggsave("./output/household_size_discrepancies_constr.png",
        height = 6, width = 8)
 
 
-## -- TOTAL SIZE  -- ##
-
 # Adjusted for TPP coverage
 
-dat %>%
-  mutate(household_size_tot = household_size/(percent_tpp/100)) -> dat
-
+print("Summary: adjusted household size")
 summary(dat$household_size_tot)
 
-ggplot(dat, aes(household_size_tot)) +
-  geom_histogram(bins = 100)
+hh_size_check %>%
+  ggplot(aes(household_size_tot)) +
+  geom_histogram(bins = 100) +
+  labs("Adjusted household size")
 
-ggsave("./output/household_size_tot.png",
-       height = 4, width = 6, units = "in")
+ggsave("./output/household_size_total.png",
+       height = 6, width = 10)
+
+hh_size_check %>%
+  ggplot(aes(household_size_tot)) +
+  geom_histogram(bins = 100) +
+  xlim(c(min(hh_size_check$household_size_tot, na.rm = T), 
+         quantile(hh_size_check$household_size_tot, 0.99, na.rm = T))) +
+  labs(title = "Adjusted household size",
+       subtitle = "x-axis cut at 99th percentile")
+
+ggsave("./output/household_size_total_constr.png",
+       height = 6, width = 10)
+
 
 
 ## -- ALL SIZE METRICS BY CARE HOME TYPE  -- ##
