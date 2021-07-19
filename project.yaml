@@ -17,9 +17,11 @@ actions:
     outputs:
       moderately_sensitive:
         log: output/check_hhid_log.txt
-        tpp_cov: output/household_tpp_coverage.png
-        tpp_size_dist: output/household_size_tpp.png
-        tot_size_dist: output/household_size_tot.png
+        fig1: output/household_tpp_coverage.png
+        fig2: output/household_size_discrepancies.png
+        fig3: output/household_size_discrepancies_constr.png
+        fig4: output/household_size_total.png
+        fig5: output/household_size_total_constr.png
 
   repeat_checks_hhid:
     needs: [generate_study_population]
