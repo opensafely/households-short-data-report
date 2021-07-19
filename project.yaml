@@ -23,3 +23,10 @@ actions:
         fig4: output/household_size_total.png
         fig5: output/household_size_total_constr.png
 
+  repeat_checks_hhid:
+    needs: [generate_study_population]
+    run:  stata-mp:latest analysis/repeat_checks_hhid.do 
+    outputs:
+      moderately_sensitive:
+        log: output/statalogs/repeat_checks_hhid.log
+
