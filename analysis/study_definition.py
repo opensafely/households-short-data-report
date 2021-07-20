@@ -66,7 +66,7 @@ study = StudyDefinition(
         },
     ),
 
-    # # https://github.com/ebmdatalab/tpp-sql-notebook/issues/52
+    ## https://github.com/ebmdatalab/tpp-sql-notebook/issues/52
     ## index of multiple deprivation, estimate of SES based on patient post code 
     ## add code to categorise into quintiles as is typically done (code from Will's VE study)
     imd=patients.categorised_as(
