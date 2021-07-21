@@ -161,6 +161,15 @@ print("# BY HOUSEHOLD #")
 
 hh_size_check <- dat[!duplicated(household_id)][,c("age","patient_id") := NULL]
 
+print("Total number of households:")
+nrow(hh_size_check)
+
+print("Mixed households:")
+table(hh_size_check$mixed_household)
+
+print("Care homes:")
+table(hh_size_check$care_home)
+
 print("Size, no. records and discrepancies, by household:")
 summary(hh_size_check)
 
@@ -169,13 +178,13 @@ hist(hh_size_check$percent_tpp, breaks = 50)
 dev.off()
 
 print("No. households with discrepant sizes:")
-sum(na.omit(hh_size_check$diff_size_count != 0))
+sum(na.omit(hh_size_check$diff_size_n != 0))
 
 print("Summary of non-zero discrepancies, by household:")
-summary(hh_size_check$diff_size_count[hh_size_check$diff_size_count != 0])
+summary(hh_size_check$diff_size_n[hh_size_check$diff_size_n != 0])
 
 print("No. households with discrepant sizes > 10")
-sum(na.omit(hh_size_check$diff_size_count > 100))
+sum(na.omit(hh_size_check$diff_size_n > 100))
 
 #------------------------------------------------------------------------------#
 
@@ -185,7 +194,7 @@ hh_size_tpp100 <- hh_size_check[percent_tpp == 100]
 summary(hh_size_tpp100)
 
 print("No. non-mixed households with discrepant sizes:")
-sum(na.omit(hh_size_tpp100$diff_size_count != 0))
+sum(na.omit(hh_size_tpp100$diff_size_n != 0))
 
 #------------------------------------------------------------------------------#
 
