@@ -7,9 +7,7 @@ study = StudyDefinition(
         "rate": "uniform",
         "incidence": 0.5,
     },
-    population=patients.registered_with_one_practice_between(
-        "2020-01-01", "2020-02-01"
-    ),
+    population=patients.registered_as_of("2020-02-01"),
     
     ## HOUSEHOLD INFORMATION
     
